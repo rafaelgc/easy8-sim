@@ -1,0 +1,35 @@
+body {
+    font-family: monospace;
+}
+
+.CodeMirror {
+    border: solid 1px #d6d6d6 !important;
+    height: 600px !important;
+}
+
+.output-label {
+    color: #6c6c6c;
+    text-transform: uppercase;
+}
+
+.output {
+    font-family: monospace;
+    width: 100%;
+    box-sizing: border-box;
+    height: 200px;
+    outline: none;
+    border: solid 1px #d6d6d6;
+}
+
+.output-output {
+    height: auto;
+    font-size: 200%;
+    text-align: center;
+    padding: 15px;
+    color: white;
+    background-color: #414141;
+}
+
+.output-errors {
+    height: auto;
+}

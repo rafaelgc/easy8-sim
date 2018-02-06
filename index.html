@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Easy8-Sim</title>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/angular-material/1.1.5/angular-material.min.css">
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="js/codemirror/lib/codemirror.css">
+    <script src="js/codemirror/lib/codemirror.js"></script>
+    <script src="js/codemirror/addon/mode/simple.js"></script>
+</head>
+<body ng-app="app">
+
+    <div class="content">
+        <div ng-controller="EditorController as ctrl">
+            <div style="margin-top: 5px">
+                <md-button ng-click="assembly()" class="md-raised md-primary">Limpiar & Ensamblar</md-button>
+                <!--<md-button ng-click="reset()" class="md-raised md-primary">Reset</md-button>-->
+                <div style="border: solid 1px #d6d6d6; display: inline-block">
+                    <md-button ng-click="run()" class="md-raised md-primary">Ejecutar</md-button>
+                    <md-button ng-click="stop()" class="md-raised md-primary">Parar</md-button>
+                </div>
+                <md-button ng-click="runStep()" class="md-raised md-primary">Ejecutar paso</md-button>
+            </div>
+
+
+
+            <div layout="row">
+                <div flex="50" style="padding: 5px">
+                    <label class="output-label">Código</label>
+                    <textarea style="display: none" id="editor"></textarea>
+                </div>
+                <div flex="50" style="padding: 5px">
+                    <label class="output-label">Salida</label>
+                    <input ng-model="output" readonly="readonly" class="output output-output">
+
+                    <div layout="row">
+                        <div flex="50" style="padding-right: 5px; padding-top: 5px">
+                            <label class="output-label">Memoria</label>
+                            <textarea id="memory" readonly="readonly" ng-model="memory" class="output"></textarea>
+                        </div>
+                        <div flex="50" style="padding-left: 5px; padding-top: 5px">
+                            <label class="output-label">Registros</label>
+                            <textarea  readonly="readonly" ng-model="registers" class="output"></textarea>
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+            </div>
+
+            <div ng-if="errors" style="box-sizing:border-box; padding: 15px 15px 30px 15px; position: fixed; bottom: 0px; width: 100%; z-index: 100; background-color: #f6f6f6; border-top: solid 1px #bfbfbf">
+                <label class="output-label">Errores</label>
+                <textarea readonly="readonly" ng-model="errors" rows="3" class="output output-errors">
+                </textarea>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+
+    <!-- Angular Material Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-material/1.1.5/angular-material.min.js"></script>
+
+    <script>
+        angular.module('app', ['ngMaterial'])
+                .config(function($interpolateProvider) {
+                    $interpolateProvider.startSymbol('{%').endSymbol('%}');
+                });
+    </script>
+    <script src="js/easy8.js"></script>
+    <script>
+        /*Mode*/
+
+        var regex = /(?:MOVEI|MOVE|COMPAREI|COMPARE|JUMP|JLESS|JEQUAL|JGREATER|ADDI|ADD|INC|SUBI|SUB|DEC|CALL|RET|PUSH|POP|STOP|IN|OUT)\b/;
+
+        CodeMirror.defineSimpleMode("simplemode", {
+            // The start state contains the rules that are intially used
+            start: [
+                // The regex matches the token, the token property contains the type
+                {regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string"},
+                // You can match multiple tokens at once. Note that the captured
+                // groups must span the whole string in this case
+                {regex: /(function)(\s+)([a-z$][\w$]*)/,
+                    token: ["keyword", null, "variable-2"]},
+
+
+                // Rules are matched in the order in which they appear, so there is
+                // no ambiguity between this one and the one above
+                {regex: regex,
+                    token: "keyword"},
+
+
+
+                {regex: /true|false|null|undefined/, token: "atom"},
+                {regex: /0x[a-f\d]+|[-+]?(?:\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/i,
+                    token: "number"},
+                {regex: /#.*/, token: "comment"},
+                {regex: /\/(?:[^\\]|\\.)*?\//, token: "variable-3"},
+                // A next property will cause the mode to move to a different state
+                {regex: /\/\*/, token: "comment", next: "comment"},
+                {regex: /[-+\/*=<>!]+/, token: "operator"},
+                // indent and dedent properties guide autoindentation
+                {regex: /[\{\[\(]/, indent: true},
+                {regex: /[\}\]\)]/, dedent: true},
+                {regex: /[a-z$][\w$]*/, token: "variable"},
+                // You can embed other modes with the mode property. This rule
+                // causes all code between << and >> to be highlighted with the XML
+                // mode.
+                {regex: /<</, token: "meta", mode: {spec: "xml", end: />>/}}
+            ],
+            // The multi-line comment state.
+            comment: [
+                {regex: /.*?\*\//, token: "comment", next: "start"},
+                {regex: /.*/, token: "comment"}
+            ],
+            // The meta property contains global information about the mode. It
+            // can contain properties like lineComment, which are supported by
+            // all modes, and also directives like dontIndentStates, which are
+            // specific to simple modes.
+            meta: {
+                dontIndentStates: ["comment"],
+                lineComment: "//"
+            }
+        });
+
+        var editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+            lineNumbers: true,
+            mode: 'simplemode'
+        });
+
+        editor.setValue('IN 00\n' +
+        'MOVE @div_dividendo, RA\n'+
+
+        'IN 00\n'+
+        'MOVE @div_divisor, RA\n'+
+
+        'CALL @div\n'+
+                'MOVE RA, @div_resultado\n'+
+        'OUT 01\n'+
+        'STOP\n\n'+
+
+        '# DIVISIÓN ENTERA (NÚM. POSITIVOS) #\n'+
+
+        '@div_dividendo: BYTE 0\n'+
+        '@div_divisor:	BYTE 0\n'+
+        '@div_resultado:	BYTE 0\n\n'+
+        '@div:\n'+
+        '\tMOVE RA, @div_dividendo\n'+
+        '\t#¿Se puede seguir restando al dividendo?\n' +
+        '\tCOMPARE RA, @div_divisor\n'+
+        '\tJLESS @div_fin #No\n'+
+
+        '\t#Si\n'+
+        '\tSUB RA, @div_divisor\n'+
+        '\tMOVE @div_dividendo, RA\n'+
+
+        '\t#Se incrementa el resultado.\n'+
+        '\tMOVE RA, @div_resultado\n'+
+        '\tINC RA\n' +
+        '\tMOVE @div_resultado, RA\n'+
+
+        '\tJUMP @div\n'+
+        '\t@div_fin:\n'+
+        '\tRET\n');
+
+    </script>
+
+    <script>
+        angular.module('app')
+        .controller('EditorController', ['$mdMenu', '$scope', '$timeout', '$mdDialog', function ($mdMenu, $scope, $timeout, $mdDialog) {
+
+            $scope.memory = '';
+            $scope.errors = '';
+            $scope.registers = '';
+            
+            alert("Hh");
+
+            var easy8 = new RuntimeEnvironment();
+            easy8.setCallbacks({
+                onMemoryUpdate: function() {
+                    //Con timeout se consigue la actualización en el próximo ciclo de
+                    //digestión. $scope.$apply no se puede usar aquí.
+                    $timeout(function () {
+                        updateMemoryTextarea();
+                    });
+                },
+                //onRegistersUpdate: $scope.$apply(updateRegistersTextarea),
+                onRegistersUpdate: function () {
+                    $timeout(function () {
+                        updateRegistersTextarea();
+                    });
+                },
+                onOutputUpdate: function(value) {
+                    $timeout(function () {
+                        updateOutputField(value);
+                    });
+                },
+                onSyntaxError: function (line) {
+                    console.error('Error de sintaxis: ' + line);
+                    $timeout(function () {
+                        $scope.errors = 'Error de sintaxis: ' + line;
+                    });
+                },
+                onInputRequest: function (func) {
+                    $scope.showPrompt(func);
+                }
+            });
+
+            $scope.assembly = function () {
+                var code = editor.getValue();
+                //ENSAMBLADO
+                easy8.assembly(code);
+                easy8.resetProgram();
+                
+                alert("Hola");
+                
+                //MOSTRAR ENSAMBLADO Y REGISTROS
+                updateMemoryTextarea();
+                updateRegistersTextarea();
+
+                $scope.errors = '';
+                $scope.output = '';
+            };
+
+            $scope.run = function () {
+                $scope.output = '';
+
+                easy8.run();
+            };
+
+            $scope.runStep = function () {
+                easy8.runStep(true);
+            };
+
+            $scope.stop = function () {
+                easy8.stop();
+            };
+
+            $scope.reset = function () {
+                easy8.resetProgram();
+                $scope.output = '';
+            }
+
+            /*
+             * CALLBACKS PARA RECIBIR NOTIFICACIONES DEL ENTORNO DE EJECUCIÓN
+             * */
+            function updateMemoryTextarea() {
+                $scope.memory = 'DIR.\tCONTENIDO\n';
+
+                var lines = 1;
+
+                for (var i = 0; i < easy8.memory.bytes.length; i++) {
+                    var pd = '0x' + ("00" + easy8.memory.bytes[i].toString(16)).slice(-2);
+                    var position = '0x' + ("00" + i.toString(16)).slice(-2);
+
+                    $scope.memory += ''
+                            .concat(position)
+                            .concat('\t')
+                            .concat(pd);
+
+                    if (easy8.registers.get('PC') === i) {
+                        $scope.memory += ' <';
+                    }
+
+                    $scope.memory += '\n';
+                    lines++;
+                }
+
+                //Para que el scroll siga al contador del programa.
+                var ta = $('#memory');
+                var lineHeight = ta[0].scrollHeight / lines;
+
+                ta[0].scrollTop = lineHeight * easy8.registers.get('PC') - ta.height() / 2;
+
+
+            }
+
+            function updateRegistersTextarea() {
+                $scope.registers = (easy8.registers.toString());
+
+                updateMemoryTextarea();
+            }
+
+            function updateOutputField(value) {
+                $scope.output = (value);
+            }
+
+            /*Diálogo de entrada de datos*/
+            $scope.showPrompt = function(func) {
+                // Appending dialog to document.body to cover sidenav in docs app
+                var confirm = $mdDialog.prompt()
+                        .title('Entrada')
+                        .textContent('Introduce el dato en formato hexadecimal.')
+                        .placeholder('')
+                        .ariaLabel('Entrada')
+                        .initialValue('0')
+                        /*.targetEvent(function () { console.log('xd'); })*/
+                        .required(true)
+                        .ok('Continuar');
+
+                $mdDialog.show(confirm).then(function(result) {
+                    func(result);
+                }, function() {
+                    func(0);
+                });
+            };
+
+        }]);
+    </script>
+</body>
+</html>
