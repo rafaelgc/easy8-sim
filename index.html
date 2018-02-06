@@ -188,8 +188,6 @@
             $scope.errors = '';
             $scope.registers = '';
             
-            alert("Hh");
-
             var easy8 = new RuntimeEnvironment();
             easy8.setCallbacks({
                 onMemoryUpdate: function() {
@@ -227,7 +225,6 @@
                 easy8.assembly(code);
                 easy8.resetProgram();
                 
-                alert("Hola");
                 
                 //MOSTRAR ENSAMBLADO Y REGISTROS
                 updateMemoryTextarea();
