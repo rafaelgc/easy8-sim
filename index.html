@@ -17,9 +17,16 @@
 </head>
 <body ng-app="app">
 
+    <input ng-model="file" ng-change="fileInputChanged" type="file" style="display: none;" id="fileInput">
+
     <div class="content">
         <div ng-controller="EditorController as ctrl">
             <div style="margin-top: 5px">
+                <div style="border: solid 1px #d6d6d6; display: inline-block">
+                    <md-button ng-click="saveLocal()" class="md-raised md-primary">Guardar</md-button>
+                    <md-button ng-click="loadLocal()" class="md-raised md-primary">Cargar</md-button>
+                </div>
+
                 <md-button ng-click="assembly()" class="md-raised md-primary">Limpiar & Ensamblar</md-button>
                 <!--<md-button ng-click="reset()" class="md-raised md-primary">Reset</md-button>-->
                 <div style="border: solid 1px #d6d6d6; display: inline-block">
@@ -178,6 +185,23 @@
         '\t@div_fin:\n'+
         '\tRET\n');
 
+
+        document.getElementById('fileInput').addEventListener('change', function(evt) {
+            //Retrieve the first (and only!) File from the FileList object
+            var f = evt.target.files[0];
+
+            if (f) {
+                var r = new FileReader();
+                r.onload = function(e) {
+                    var contents = e.target.result;
+
+                    editor.setValue(contents);
+                }
+                r.readAsText(f);
+            } else {
+                alert("Failed to load file");
+            }
+        });
     </script>
 
     <script>
@@ -251,7 +275,17 @@
             $scope.reset = function () {
                 easy8.resetProgram();
                 $scope.output = '';
-            }
+            };
+
+            $scope.saveLocal = function() {
+                saveLocal('saved.e8asm', editor.getValue());
+            };
+
+            $scope.loadLocal = function() {
+                // El usuario hace clic en el botón para cargar un
+                // fichero. Se muestra el diálogo de selección.
+                $('#fileInput').click();
+            };
 
             /*
              * CALLBACKS PARA RECIBIR NOTIFICACIONES DEL ENTORNO DE EJECUCIÓN
@@ -316,6 +350,21 @@
                     func(0);
                 });
             };
+
+            /* DESCARGA EN LOCAL */
+            function saveLocal(filename, text) {
+                var element = document.createElement('a');
+                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+                element.setAttribute('download', filename);
+
+                element.style.display = 'none';
+                document.body.appendChild(element);
+
+                element.click();
+
+                document.body.removeChild(element);
+            }
+
 
         }]);
     </script>
